@@ -5,60 +5,49 @@ from botocore.exceptions import ClientError
 
 def check_items():
     wait_end = ""
-    bucket = 'usu-cs5260-ignite-dist'
+    bucket = 'usu-cs5260-ignite-requests'
     key = 'hello world.txt'
     
     # while wait_end != "end"
     conn = client('s3')  
     for key in conn.list_objects(Bucket=bucket)['Contents']:
-        print(key['Key'])
+        # print(key['Key'])
         s3 = boto3.client('s3')
         obj = s3.get_object(Bucket=bucket, Key=key['Key'])
         j_data = json.loads(obj['Body'].read())
-        print(j_data)
-        print(j_data['type'])
+        create_widget_s3(j_data)
         
 
 def create_widget_s3(j_data):
+    s3 = boto3.client('s3')
     
-    DDB = boto3.client('s3', region_name='us-east-1')
+    # try:
+    new_object={
+        'widget_id': {
+            'S': j_data['widgetId']
+        },
+        'owner': {
+            'S': j_data['owner']
+        },
+        'label':{
+            'S': j_data['label']
+        },
+        'description':{
+            'S': j_data['description']
+        }
+    }
     
-    try:
-        response = DDB.put_item(
-            TableName='<FMI_1>',
-            Item={
-                'widget_id': {
-                    'S': '<FMI_2>'
-                },
-                'owner': {
-                    'S': '<FMI_3>'
-                },
-                'label':{
-                    'S': '<FMI_4>' #number passed in as a string (ie in quotes)
-                },
-                'description':{
-                    'S': "<FMI_5>"
-                },
-                'description':{
-                    'S': "<FMI_5>"
-                },
-                'tags':{
-                    'L': [{
-                            'S': '<FMI_6>'
-                        },{
-                            'S': '<FMI_7>'
-                        }]
-                }
-            },
-            ConditionExpression='attribute_not_exists(product_name)'
-        )
-    except ClientError as e:
-        # Ignore the ConditionalCheckFailedException, bubble up
-        # other exceptions.
-        if e.response['Error']['Code'] != 'ConditionalCheckFailedException':
-            pass
+    response = s3.put_object(
+        Body = json.dumps(new_object),
+        Bucket ='usu-cs5260-ignite-dist',
+        Key = j_data['owner'] + '/' + j_data['widgetId'],
+    )
+    print('done')
+        
+    # except ClientError as e:
+    #     pass
 
-def put_dynamodb():
+def create_widget_dynamodb(j_data):
     
     DDB = boto3.client('dynamodb', region_name='us-east-1')
     
