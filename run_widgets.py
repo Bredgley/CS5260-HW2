@@ -4,10 +4,17 @@ import time
 from boto3 import client
 from botocore.exceptions import ClientError
 
+def main():
+    if sys.argv[1] != 's3' and sys.argv[1] != 'dynamodb':
+        print("Please choose 's3' or 'dynamodb' to choose a location to store widgets")
+    else:
+        check_items(sys.argv[1])
+
 def check_items(source):
     wait_end = ""
     bucket = 'usu-cs5260-ignite-requests'
-    key = 'hello world.txt'
+    f = open("consumer_log.txt", "x")
+    f.close()
     
     while wait_end != "end":
         wait_end = input()
@@ -18,19 +25,28 @@ def check_items(source):
                 obj = s3.get_object(Bucket=bucket, Key=key['Key'])
                 j_data = json.loads(obj['Body'].read())
                 
-                
-                if source == 's3':
-                    create_widget_s3(j_data)
+                if j_data['type'] != 'create':
+                    continue
                 else:
-                    create_widget_dynamodb(j_data)
-                
+                    f = open("consumer_log.txt", "a")
+                    f.write("Creating Widget from request:" + j_data['requestId'])
+                    f.close()
+                    
+                    if source == 's3':
+                        create_widget_s3(j_data)
+                    else:
+                        create_widget_dynamodb(j_data)
+                    
                 delete_object(bucket, key['Key'])
+                f = open("consumer_log.txt", "a")
+                f.write("Deleted request:" + j_data['requestId'])
+                f.write("=======")
+                f.close()
         else:
             time.sleep(0.1)
 
 def create_widget_s3(j_data):
     s3 = boto3.client('s3')
-    
     
     new_object={
         'widget_id': {
@@ -88,7 +104,4 @@ def delete_object(bucket, object_key):
     s3.Object(bucket, object_key).delete()
 
 
-if sys.argv[1] != 's3' and sys.argv[1] != 'dynamodb':
-    print("Please choose 's3' or 'dynamodb' to choose a location to store widgets")
-else:
-    check_items(sys.argv[1])
+main()
