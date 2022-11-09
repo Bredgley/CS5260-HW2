@@ -8,42 +8,88 @@ def main():
     if sys.argv[1] != 's3' and sys.argv[1] != 'dynamodb':
         print("Please choose 's3' or 'dynamodb' to choose a location to store widgets")
     else:
-        check_items(sys.argv[1])
-
-def check_items(source):
+        if len(sys.argv) > 2:
+            check_items_sqs(sys.argv[1])
+        else:
+            check_items_s3(sys.argv[1])
+            
+def check_items_sqs(destination):
     wait_end = ""
     bucket = 'usu-cs5260-ignite-requests'
     f = open("consumer_log.txt", "x")
     f.close()
+
+def check_items_s3(destination):
+    wait_end = ""
+    bucket = 'usu-cs5260-ignite-requests'
+    bucketDest = 'usu-cs5260-ignite-dist'
+    f = open("consumer_log.txt", "x")
     
     while wait_end != "end":
-        wait_end = input()
         conn = client('s3')  
         if len(conn.list_objects(Bucket=bucket)['Contents']) > 0:
             for key in conn.list_objects(Bucket=bucket)['Contents']:
                 s3 = boto3.client('s3')
                 obj = s3.get_object(Bucket=bucket, Key=key['Key'])
                 j_data = json.loads(obj['Body'].read())
-                
-                if j_data['type'] != 'create':
-                    continue
-                else:
-                    f = open("consumer_log.txt", "a")
-                    f.write("Creating Widget from request:" + j_data['requestId'])
-                    f.close()
-                    
-                    if source == 's3':
-                        create_widget_s3(j_data)
-                    else:
-                        create_widget_dynamodb(j_data)
-                    
-                delete_object(bucket, key['Key'])
-                f = open("consumer_log.txt", "a")
-                f.write("Deleted request:" + j_data['requestId'])
-                f.write("=======")
-                f.close()
+                process_request(key, j_data, bucket, bucketDest, destination)
         else:
+            print('.')
             time.sleep(0.1)
+            
+def process_request(key, j_data, bucket, bucketDest, destination):
+    if j_data['type'] == 'create':
+        
+        f = open("consumer_log.txt", "a")
+        f.write("Creating Widget from request:" + j_data['requestId'] + "\n")
+        print("Creating Widget from request:" + j_data['requestId'])
+        f.close()
+        
+        if destination == 's3':
+            create_widget_s3(j_data)
+        else:
+            create_widget_dynamodb(j_data)
+            
+    elif j_data['type'] == 'update':
+        
+        f = open("consumer_log.txt", "a")
+        f.write("Updating Widget from request:" + j_data['requestId'] + "\n")
+        print("Updating Widget from request:" + j_data['requestId'])
+        f.close()
+        
+        if destination == 's3':
+            s3 = boto3.client('s3')
+            newKey = "" + j_data['owner'] + j_data['widgetId']
+            obj = s3.get_object(Bucket=bucketDest, Key=newKey)
+            j = json.loads(obj['Body'].read())
+            j_data = combine_files(j_data, j)
+            delete_object(bucketDest, newKey)
+            time.sleep(1)
+            create_widget_s3(j_data)
+            
+    else:
+        
+        f = open("consumer_log.txt", "a")
+        f.write("Deleted Widget request:" + j_data['requestId'] + "\n")
+        print("Deleted Widget request:" + j_data['requestId'])
+        f.close()
+        
+        if destination == 's3':
+            newKey = "" + j_data['owner'] + j_data['widgetId']
+            delete_object(bucketDest, newKey)
+        
+    delete_object(bucket, key['Key'])
+    f = open("consumer_log.txt", "a")
+    f.write("Deleted Widget request:" + j_data['requestId'] + "\n")
+    print("Deleted Widget request:" + j_data['requestId'])
+    f.write("=======" + "\n")
+    f.close()
+
+def combine_files(jsonNew, jsonOld)
+    jsonCombine = jsonOld
+    for key in jsonCombine:
+        jsonCombine[key] = jsonNew[key]
+    return jsonCombine
 
 def create_widget_s3(j_data):
     s3 = boto3.client('s3')
@@ -96,8 +142,6 @@ def create_widget_dynamodb(j_data):
         TableName='widgets',
         Item=new_object,
     )
-    
-    
         
 def delete_object(bucket, object_key):
     s3 = boto3.resource('s3')
@@ -105,3 +149,4 @@ def delete_object(bucket, object_key):
 
 
 main()
+        
