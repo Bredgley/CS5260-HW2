@@ -23,7 +23,7 @@ def check_items_s3(destination):
     wait_end = ""
     bucket = 'usu-cs5260-ignite-requests'
     bucketDest = 'usu-cs5260-ignite-dist'
-    f = open("consumer_log.txt", "x")
+    f = open("consumer_log.txt", "w")
     
     while wait_end != "end":
         conn = client('s3')  
@@ -59,13 +59,13 @@ def process_request(key, j_data, bucket, bucketDest, destination):
         
         if destination == 's3':
             s3 = boto3.client('s3')
-            newKey = "" + j_data['owner'] + j_data['widgetId']
+            newKey = "" + j_data['owner'] + '/' + j_data['widgetId']
             obj = s3.get_object(Bucket=bucketDest, Key=newKey)
             j = json.loads(obj['Body'].read())
-            j_data = combine_files(j_data, j)
+            j_data_up = combine_files(j_data, j)
             delete_object(bucketDest, newKey)
             time.sleep(1)
-            create_widget_s3(j_data)
+            create_widget_s3(j_data_up)
             
     else:
         
@@ -73,29 +73,30 @@ def process_request(key, j_data, bucket, bucketDest, destination):
         f.write("Deleted Widget request:" + j_data['requestId'] + "\n")
         print("Deleted Widget request:" + j_data['requestId'])
         f.close()
-        
+        0
         if destination == 's3':
-            newKey = "" + j_data['owner'] + j_data['widgetId']
+            newKey = "" + j_data['owner'] + '/' + j_data['widgetId']
             delete_object(bucketDest, newKey)
         
     delete_object(bucket, key['Key'])
     f = open("consumer_log.txt", "a")
-    f.write("Deleted Widget request:" + j_data['requestId'] + "\n")
-    print("Deleted Widget request:" + j_data['requestId'])
+    f.write("Deleted Widget request" + "\n")
+    print("Deleted Widget request")
     f.write("=======" + "\n")
     f.close()
 
-def combine_files(jsonNew, jsonOld)
+def combine_files(jsonNew, jsonOld):
     jsonCombine = jsonOld
     for key in jsonCombine:
-        jsonCombine[key] = jsonNew[key]
+        if key in jsonNew:
+            jsonCombine[key] = "" + jsonNew[key]
     return jsonCombine
 
 def create_widget_s3(j_data):
     s3 = boto3.client('s3')
     
     new_object={
-        'widget_id': {
+        'widgetId': {
             'S': j_data['widgetId']
         },
         'owner': {
@@ -120,7 +121,7 @@ def create_widget_s3(j_data):
 def create_widget_dynamodb(j_data):
     
     new_object={
-            'id': {
+            'widgetId': {
                 'S': j_data['widgetId']
             },
             'owner': {
@@ -149,4 +150,3 @@ def delete_object(bucket, object_key):
 
 
 main()
-        
