@@ -16,9 +16,19 @@ def main():
 def check_items_sqs(destination):
     wait_end = ""
     bucket = 'usu-cs5260-ignite-requests'
-    f = open("consumer_log.txt", "x")
-    f.close()
-
+    bucketDest = 'usu-cs5260-ignite-dist'
+    f = open("consumer_log.txt", "w")
+    sqs = boto3.resource('sqs')
+    
+    while wait_end != "end":
+        queue = sqs.get_queue_by_name(QueueName='cs5260-requests')
+        for message in queue.receive_messages():
+            obj = "" + message.body + ""
+            j_data = json.loads(obj)
+            process_request(message.body, j_data, bucket, bucketDest, destination)
+            message.delete()
+        time.sleep(0.1)
+    
 def check_items_s3(destination):
     wait_end = ""
     bucket = 'usu-cs5260-ignite-requests'
@@ -33,6 +43,13 @@ def check_items_s3(destination):
                 obj = s3.get_object(Bucket=bucket, Key=key['Key'])
                 j_data = json.loads(obj['Body'].read())
                 process_request(key, j_data, bucket, bucketDest, destination)
+                
+                delete_object(bucket, key['Key'])
+                f = open("consumer_log.txt", "a")
+                f.write("Deleted Widget request" + "\n")
+                print("Deleted Widget request")
+                f.write("=======" + "\n")
+                f.close()
         else:
             print('.')
             time.sleep(0.1)
@@ -66,7 +83,8 @@ def process_request(key, j_data, bucket, bucketDest, destination):
             delete_object(bucketDest, newKey)
             time.sleep(1)
             create_widget_s3(j_data_up)
-            
+        else:
+            pass
     else:
         
         f = open("consumer_log.txt", "a")
@@ -78,12 +96,8 @@ def process_request(key, j_data, bucket, bucketDest, destination):
             newKey = "" + j_data['owner'] + '/' + j_data['widgetId']
             delete_object(bucketDest, newKey)
         
-    delete_object(bucket, key['Key'])
-    f = open("consumer_log.txt", "a")
-    f.write("Deleted Widget request" + "\n")
-    print("Deleted Widget request")
-    f.write("=======" + "\n")
-    f.close()
+        else:
+            pass
 
 def combine_files(jsonNew, jsonOld):
     jsonCombine = jsonOld
